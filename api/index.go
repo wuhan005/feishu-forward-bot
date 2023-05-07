@@ -33,5 +33,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	_, _ = w.Write([]byte("{}"))
 }
