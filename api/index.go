@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -26,7 +26,37 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	receiveID := os.Getenv("LARK_RECEIVE_ID")
 
 	client := lark.New(lark.WithAppCredential(appID, appSecret))
-	_, _, err := client.Message.ForwardMessage(context.Background(), &lark.ForwardMessageReq{
+	messageResp, _, err := client.Message.GetMessage(r.Context(), &lark.GetMessageReq{
+		MessageID: requestBody.MessageID,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sender := messageResp.Items[0].Sender
+	senderResp, _, err := client.Contact.GetUser(r.Context(), &lark.GetUserReq{
+		UserIDType: &sender.IDType,
+		UserID:     sender.ID,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	senderName := senderResp.User.Name
+	_, _, err = client.Message.SendRawMessage(r.Context(), &lark.SendRawMessageReq{
+		ReceiveIDType: lark.IDType(receiveIDType),
+		ReceiveID:     receiveID,
+		MsgType:       lark.MsgTypeText,
+		Content:       fmt.Sprintf(`{"text": "收到来自 %s 的消息"}`, senderName),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, _, err = client.Message.ForwardMessage(r.Context(), &lark.ForwardMessageReq{
 		MessageID:     requestBody.MessageID,
 		ReceiveIDType: lark.IDType(receiveIDType),
 		ReceiveID:     receiveID,
